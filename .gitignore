@@ -1,0 +1,4 @@
+node_modules/
+.test-tmp/
+*.vsix
+!downloads/claude-profile-switcher.vsix

@@ -1,0 +1,70 @@
+{
+  "name": "claude-profile-switcher",
+  "displayName": "Claude Profile Switcher (Prototype)",
+  "description": "Select isolated Claude Code profiles for the official chat panel and CLI terminals.",
+  "version": "0.0.5",
+  "publisher": "local-prototype",
+  "repository": { "type": "git", "url": "https://github.com/werksitecore/ClaudeProfileSwitcher.git" },
+  "homepage": "https://github.com/werksitecore/ClaudeProfileSwitcher#readme",
+  "bugs": { "url": "https://github.com/werksitecore/ClaudeProfileSwitcher/issues" },
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.94.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./src/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "extensionKind": [
+    "ui"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false
+    },
+    "virtualWorkspaces": false
+  },
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check src/extension.js && node --check src/profiles.js && node --check src/history.js",
+    "package": "vsce package --no-dependencies --out downloads/claude-profile-switcher.vsix"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "claudeProfiles.advancedSwitch",
+        "title": "Claude Profiles: Advanced Switch"
+      },
+      {
+        "command": "claudeProfiles.resume",
+        "title": "Claude Profiles: Resume Copied Conversation"
+      },
+      {
+        "command": "claudeProfiles.create",
+        "title": "Claude Profiles: Create Profile"
+      },
+      {
+        "command": "claudeProfiles.switch",
+        "title": "Claude Profiles: Switch Chat Panel Profile"
+      },
+      {
+        "command": "claudeProfiles.terminal",
+        "title": "Claude Profiles: Open CLI with Profile"
+      },
+      {
+        "command": "claudeProfiles.login",
+        "title": "Claude Profiles: Sign In to Profile"
+      },
+      {
+        "command": "claudeProfiles.restore",
+        "title": "Claude Profiles: Restore Original Panel Configuration"
+      }
+    ]
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^4.1.0"
+  }
+}

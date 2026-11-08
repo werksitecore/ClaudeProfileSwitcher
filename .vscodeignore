@@ -1,0 +1,8 @@
+node_modules/**
+.test-tmp/**
+test/**
+.vscode/**
+*.vsix
+downloads/**
+docs/**
+.gitignore
