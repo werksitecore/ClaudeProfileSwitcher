@@ -2,11 +2,17 @@
   "name": "claude-profile-switcher",
   "displayName": "Claude Profile Switcher (Prototype)",
   "description": "Select isolated Claude Code profiles for the official chat panel and CLI terminals.",
-  "version": "0.0.5",
+  "version": "0.0.10",
+  "preview": true,
   "publisher": "local-prototype",
-  "repository": { "type": "git", "url": "https://github.com/werksitecore/ClaudeProfileSwitcher.git" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/werksitecore/ClaudeProfileSwitcher.git"
+  },
   "homepage": "https://github.com/werksitecore/ClaudeProfileSwitcher#readme",
-  "bugs": { "url": "https://github.com/werksitecore/ClaudeProfileSwitcher/issues" },
+  "bugs": {
+    "url": "https://github.com/werksitecore/ClaudeProfileSwitcher/issues"
+  },
   "license": "MIT",
   "engines": {
     "vscode": "^1.94.0"
@@ -28,8 +34,8 @@
     "virtualWorkspaces": false
   },
   "scripts": {
-    "test": "node --test",
-    "check": "node --check src/extension.js && node --check src/profiles.js && node --check src/history.js",
+    "test": "node --test test",
+    "check": "node --check src/extension.js && node --check src/profiles.js && node --check src/history.js && node --check src/tab-switch.js && node --check src/recovery.js && node --check src/terminal-profile.js && node --check src/cli-continuation.js",
     "package": "vsce package --no-dependencies --out downloads/claude-profile-switcher.vsix"
   },
   "contributes": {
@@ -61,10 +67,19 @@
       {
         "command": "claudeProfiles.restore",
         "title": "Claude Profiles: Restore Original Panel Configuration"
+      },
+      {
+        "command": "claudeProfiles.switchCli",
+        "title": "Claude Profiles: Switch CLI Profile and Continue"
       }
     ]
   },
   "devDependencies": {
     "@vscode/vsce": "^4.1.0"
+  },
+  "overrides": {
+    "@vscode/vsce": {
+      "minimatch": "^11.0.5"
+    }
   }
 }

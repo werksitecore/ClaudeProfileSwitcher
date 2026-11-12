@@ -1,0 +1,1 @@
+require('fs').writeFileSync(process.argv[2], JSON.stringify({directory:process.env.CLAUDE_CONFIG_DIR,authPresent:['ANTHROPIC_API_KEY','ANTHROPIC_AUTH_TOKEN','CLAUDE_CODE_OAUTH_TOKEN'].some(k=>!!process.env[k])}));

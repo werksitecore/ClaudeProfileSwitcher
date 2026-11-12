@@ -1,4 +1,8 @@
 node_modules/
 .test-tmp/
+.isolated-vscode/
+.isolated-live/
+.local-backups/
 *.vsix
 !downloads/claude-profile-switcher.vsix
+.isolated-cli-probe/

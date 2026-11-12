@@ -1,0 +1,6 @@
+{
+  "status": "fail",
+  "phase": "baseline",
+  "events": [],
+  "error": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n+ actual - expected\n\n  [\n    {\n+     name: 'CLAUDE_CONFIG_DIR',\n+     value: 'c:\\\\Git-Projects\\\\ClaudeProfileSwitcher\\\\.isolated-vscode\\\\home\\\\.claude-profile-switcher\\\\profiles\\\\work'\n+   },\n+   {\n      name: 'FIXTURE_KEEP',\n      value: 'yes'\n    }\n  ]\n\n\tat exports.run (c:\\Git-Projects\\ClaudeProfileSwitcher\\.isolated-vscode\\driver\\run.js:38:12)"
+}

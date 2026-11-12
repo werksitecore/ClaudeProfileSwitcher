@@ -4,21 +4,20 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
 const crypto = require('node:crypto');
-const { CONFIG, AUTH, restoreDirectory, conflicts, defaultProfile, panelEntries } = require('./profiles');
+const { CONFIG, restoreDirectory, conflicts, defaultProfile, panelEntries } = require('./profiles');
 const { listSessions, transferSession, transferWorkspace } = require('./history');
+const { REOPEN, switchEditorTab } = require('./tab-switch');
+const { recoveryConfiguration } = require('./recovery');
+const { syncTerminalProfile, profileTerminalOptions } = require('./terminal-profile');
+const { CliContinuation, assertDestinationAvailable, assertDestinationReady } = require('./cli-continuation');
 
 async function activate(context) {
+  const cli = new CliContinuation();
   const savedProfiles = () => context.globalState.get('profiles', []).filter(p => !p.builtin);
   const config = () => vscode.workspace.getConfiguration('claudeCode');
   const entries = () => config().get('environmentVariables', []);
-  let defaults = context.globalState.get('defaultConfiguration');
-  if (!defaults) {
-    const original = context.globalState.get('original');
-    const current = entries().filter(e => e.name === CONFIG);
-    const managed = savedProfiles().some(p => p.directory === current[0]?.value);
-    defaults = { directoryEntries: original?.directoryEntries ?? (managed ? [] : current), inheritedDirectory: process.env[CONFIG] || null };
-    await context.globalState.update('defaultConfiguration', defaults);
-  }
+  const defaults = recoveryConfiguration({ defaults: context.globalState.get('defaultConfiguration'), original: context.globalState.get('original'), entries: entries(), inherited: process.env[CONFIG], home: os.homedir(), profiles: savedProfiles() });
+  await context.globalState.update('defaultConfiguration', defaults);
   const builtin = defaultProfile(defaults.directoryEntries, defaults.inheritedDirectory, os.homedir());
   const profiles = () => [builtin, ...savedProfiles()];
   const currentDirectory = () => entries().find(e => e.name === CONFIG)?.value || process.env[CONFIG] || path.join(os.homedir(), '.claude');
@@ -27,6 +26,8 @@ async function activate(context) {
   bar.command = 'claudeProfiles.switch';
   function refresh() {
     const directory = currentDirectory();
+    if (vscode.env.remoteName || !vscode.workspace.isTrusted) context.environmentVariableCollection?.clear();
+    else syncTerminalProfile(context.environmentVariableCollection, entries().find(e => e.name === CONFIG)?.value || defaults.inheritedDirectory);
     const selected = profiles().find(isCurrent);
     bar.text = `$(account) Claude: ${selected?.name || (directory ? 'External' : 'Default')}`;
     bar.tooltip = 'Configured panel profile; existing conversations and CLI processes may use an earlier profile. Click to switch.';
@@ -53,34 +54,97 @@ async function activate(context) {
   async function launch(profile, login = false, session) {
     if (!profile) return;
     // Launch the executable directly: profile data never becomes shell code.
-    const env = { [CONFIG]: profile.builtin ? profile.configValue : profile.directory };
-    for (const name of AUTH) env[name] = null;
-    const terminal = vscode.window.createTerminal({ name: `Claude: ${profile.name}${login ? ' (login)' : ''}`, shellPath: 'claude', shellArgs: login ? ['auth', 'login'] : session ? ['--resume', session.id] : [], cwd: session?.cwd, env });
+    const options = profileTerminalOptions(profile, process.env, login, session);
+    // Use the panel's matching CLI, whose session registry supports exact tracking.
+    const extensionPath = vscode.extensions.getExtension('anthropic.claude-code')?.extensionPath;
+    if (extensionPath) {
+      const binary = path.join(extensionPath, 'resources', 'native-binary', process.platform === 'win32' ? 'claude.exe' : 'claude');
+      try { await fs.access(binary); options.shellPath = binary; } catch { /* Standalone CLI remains supported. */ }
+    }
+    const terminal = vscode.window.createTerminal(options);
+    if (!login) cli.track(terminal, profile);
     terminal.show();
+    return terminal;
+  }
+  async function restoreStoppedCli(planned) {
+    for (const item of planned.filter(item => item.stopped)) await launch(item.record.profile, false, item.session);
+  }
+  async function switchCliTo(profile) {
+    if (!profile) return;
+    const record = cli.records.get(vscode.window.activeTerminal);
+    if (!record) throw new Error('Focus a CLI opened with Claude Profiles first. Ordinary shell terminals are not restarted automatically.');
+    if (path.resolve(record.profile.directory).toLowerCase() === path.resolve(profile.directory).toLowerCase()) return;
+    const planned = await cli.plan([record]);
+    const item = planned[0];
+    await assertDestinationReady(profile, item.session.cwd);
+    await assertDestinationAvailable(profile.directory, item.session.id);
+    try {
+      await cli.stop(item);
+      await transferSession(record.profile.directory, profile.directory, item.session);
+    } catch (error) {
+      await restoreStoppedCli(planned);
+      throw error;
+    }
+    await launch(profile, false, item.session);
   }
   async function quickSwitch() {
+    const profile = await choose();
+    if (!profile) return;
+    // With no active Claude tab, Default is a settings-only recovery operation.
+    // With an active tab, use the same backed-up transfer/restart in both directions.
+    const tab = vscode.window.tabGroups.activeTabGroup.activeTab;
+    const claudeTab = tab?.input instanceof vscode.TabInputWebview && tab.input.viewType.includes('claudeVSCodePanel');
+    if (!claudeTab && cli.records.has(vscode.window.activeTerminal)) return switchCliTo(profile);
+    if (isCurrent(profile)) return;
+    if (profile.builtin && !claudeTab) return restore();
     const claude = vscode.extensions.getExtension('anthropic.claude-code');
     if (!claude) throw new Error('Install the official Anthropic Claude Code extension first.');
+    if (!claudeTab) throw new Error('Open and focus a Claude editor tab before switching. Sidebar-only switching is available through Advanced Switch.');
+    await claude.activate();
+    if (!(await vscode.commands.getCommands(true)).includes(REOPEN)) throw new Error('Update Claude Code: this version does not expose Reopen Closed Session.');
     const source = entries().find(e => e.name === CONFIG)?.value || process.env[CONFIG] || path.join(os.homedir(), '.claude');
-    const profile = (await vscode.window.showQuickPick(profiles().map(p => ({ label: p.name, description: `${isCurrent(p) ? 'Current · ' : ''}${p.builtin ? 'Existing Claude setup' : 'Keep this workspace’s chat history'}`, profile: p })), { title: 'Switch Claude account and continue chat' }))?.profile;
-    if (!profile || isCurrent(profile)) return;
     const found = conflicts(entries(), process.env);
     if (found.length) throw new Error(`Conflicting authentication/provider variables: ${found.join(', ')}. Remove them before switching subscription accounts.`);
     const folders = (vscode.workspace.workspaceFolders || []).map(f => f.uri.fsPath);
     if (!folders.length) throw new Error('Open the conversation’s project folder before switching.');
     const sessions = await listSessions(source, folders);
+    if (!sessions.length) throw new Error('No saved conversation was found for this workspace. Switching was cancelled; your account and history are unchanged.');
     if (sessions.some(session => Date.now() - session.modified < 2000)) throw new Error('Claude is still saving workspace history. Stop the response, wait a moment, and switch again.');
-    await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Switching Claude to ${profile.name}`, cancellable: false }, async () => {
-      const copied = await transferWorkspace(source, profile.directory, sessions);
-      if (!context.globalState.get('original')) await context.globalState.update('original', { directoryEntries: entries().filter(e => e.name === CONFIG) });
-      await config().update('environmentVariables', panelEntries(entries(), profile), vscode.ConfigurationTarget.Global);
-      // Claude owns sidebar/tab selection and restores its existing session IDs after reload.
-      // Never guess a current session from titles or open a different chat automatically.
-      await context.workspaceState.update('pendingResume', undefined);
-      await context.workspaceState.update('lastWorkspaceTransfer', { profile, sessions: copied });
-      refresh();
-    });
-    await vscode.commands.executeCommand('workbench.action.reloadWindow');
+    const previous = entries();
+    const plannedCli = await cli.plan([...cli.records.values()].filter(record => path.resolve(record.profile.directory).toLowerCase() === path.resolve(source).toLowerCase()));
+    for (const item of plannedCli) await assertDestinationReady(profile, item.session.cwd);
+    for (const item of plannedCli) await assertDestinationAvailable(profile.directory, item.session.id);
+    let copied;
+    try { await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Switching Claude to ${profile.name}`, cancellable: false }, () => switchEditorTab({
+      tab,
+      close: target => vscode.window.tabGroups.close(target, true),
+      reopen: () => vscode.commands.executeCommand(REOPEN),
+      prepare: async () => {
+        for (const item of plannedCli) await cli.stop(item);
+        // Allow Claude's asynchronous tab shutdown to flush its saved transcript.
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        const saved = await listSessions(source, folders);
+        copied = await transferWorkspace(source, profile.directory, saved);
+        for (const item of plannedCli) {
+          if (!copied.some(session => session.id === item.session.id)) await transferSession(source, profile.directory, item.session);
+        }
+      },
+      apply: async () => {
+        if (!context.globalState.get('original')) await context.globalState.update('original', { directoryEntries: previous.filter(e => e.name === CONFIG) });
+        await context.workspaceState.update('pendingResume', undefined);
+        await context.workspaceState.update('lastWorkspaceTransfer', { profile, sessions: copied });
+        await config().update('environmentVariables', panelEntries(entries(), profile), vscode.ConfigurationTarget.Global);
+        refresh();
+      },
+      rollback: async () => {
+        await config().update('environmentVariables', restoreDirectory(entries(), previous.filter(e => e.name === CONFIG)), vscode.ConfigurationTarget.Global);
+        refresh();
+      }
+    })); } catch (error) {
+      await restoreStoppedCli(plannedCli);
+      throw error;
+    }
+    for (const item of plannedCli) await launch(profile, false, item.session);
   }
   async function switchProfile() {
     if (!vscode.extensions.getExtension('anthropic.claude-code')) throw new Error('Install the official Anthropic Claude Code extension first.');
@@ -136,23 +200,25 @@ async function activate(context) {
     if (action === 'Show Backup') await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(path.join(pending.session.backup, 'manifest.json')));
   }
   async function restore() {
-    const original = context.globalState.get('original');
-    if (!original) return vscode.window.showInformationMessage('No original panel configuration has been saved.');
-    await config().update('environmentVariables', restoreDirectory(entries(), original.directoryEntries), vscode.ConfigurationTarget.Global);
-    await context.globalState.update('original', undefined);
+    await config().update('environmentVariables', restoreDirectory(entries(), builtin.directoryEntries), vscode.ConfigurationTarget.Global);
+    await context.workspaceState.update('pendingResume', undefined);
+    await context.workspaceState.update('lastWorkspaceTransfer', undefined);
     refresh();
-    await vscode.window.showInformationMessage('Original panel directory configuration restored. Reload before starting a new Claude conversation. Profile files have been retained.');
+    await vscode.window.showInformationMessage('Default configuration restored. No history files were changed. Close and reopen Claude to use it.');
   }
   let busy = false;
-  for (const [command, run] of Object.entries({ create, switch: quickSwitch, advancedSwitch: switchProfile, resume: resumeCopied, terminal: async () => launch(await choose()), login: async () => launch(await choose(), true), restore })) {
+  for (const [command, run] of Object.entries({ create, switch: quickSwitch, switchCli: async () => switchCliTo(await choose()), advancedSwitch: switchProfile, resume: resumeCopied, terminal: async () => launch(await choose()), login: async () => launch(await choose(), true), restore })) {
     context.subscriptions.push(vscode.commands.registerCommand(`claudeProfiles.${command}`, async () => {
       if (vscode.env.remoteName) return vscode.window.showErrorMessage('This prototype supports local VS Code windows only.');
-      if (!vscode.workspace.isTrusted || busy) return;
+      if ((!vscode.workspace.isTrusted && command !== 'restore') || busy) return;
       busy = true;
       try { await run(); } catch (error) { await vscode.window.showErrorMessage(`Claude Profiles: ${error.message}`); } finally { busy = false; }
     }));
   }
-  context.subscriptions.push(bar, vscode.workspace.onDidChangeConfiguration(refresh));
+  context.subscriptions.push(bar, vscode.workspace.onDidChangeConfiguration(refresh), {
+    dispose: () => context.environmentVariableCollection?.clear()
+  });
+  if (vscode.window.onDidCloseTerminal) context.subscriptions.push(vscode.window.onDidCloseTerminal(terminal => cli.forget(terminal)));
   refresh();
   const pending = context.workspaceState.get('pendingResume');
   if (pending?.autoResume && !vscode.env.remoteName && vscode.workspace.isTrusted) {

@@ -40,6 +40,10 @@ function validateTranscript(data, id) {
   }
   if (!messages) throw new Error('No resumable messages found');
 }
+function insideWorkspace(workspace, cwd) {
+  const base = path.resolve(workspace).toLowerCase(), target = path.resolve(cwd).toLowerCase();
+  return target === base || target.startsWith(base.endsWith(path.sep) ? base : base + path.sep);
+}
 async function listSessions(root, workspaces) {
   const result = [];
   let projects;
@@ -55,11 +59,14 @@ async function listSessions(root, workspaces) {
       const stat = await fs.stat(full);
       if (stat.size > 100 * 1024 * 1024) continue;
       const data = await fs.readFile(full, 'utf8');
-      let cwd, title, summary, firstPrompt;
+      let cwd, title, summary, firstPrompt, hasMessages = false;
       for (const line of data.split('\n')) {
         try {
           const row = JSON.parse(line);
-          if (typeof row.cwd === 'string') cwd = row.cwd;
+          if (row.type === 'user' || row.type === 'assistant') hasMessages = true;
+          // The first cwd is the launch folder Claude resumes from; later rows
+          // follow Bash `cd` into subfolders and must not hide the session.
+          if (!cwd && typeof row.cwd === 'string') cwd = row.cwd;
           if (typeof row.customTitle === 'string') title = row.customTitle;
           if (typeof row.summary === 'string') summary = row.summary;
           if (!firstPrompt && row.type === 'user' && !row.isMeta) {
@@ -69,7 +76,7 @@ async function listSessions(root, workspaces) {
           }
         } catch { /* A writer may still be appending; transfer validates later. */ }
       }
-      if (!cwd || !workspaces.some(w => path.resolve(w).toLowerCase() === path.resolve(cwd).toLowerCase())) continue;
+      if (!hasMessages || !cwd || !workspaces.some(w => insideWorkspace(w, cwd))) continue;
       const titles = [title, summary, firstPrompt].filter(s => typeof s === 'string' && s.trim()).map(s => s.replace(/\s+/g, ' ').trim());
       result.push({ id, project: project.name, cwd, title: titles[0] || 'Untitled conversation', titles, modified: stat.mtimeMs });
     }

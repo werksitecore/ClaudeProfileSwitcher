@@ -1,0 +1,11 @@
+{
+  "status": "pass",
+  "vscode": "1.131.0",
+  "events": [
+    "Two distinct signed-in isolated accounts verified",
+    "Default: panel and managed CLI have their distinct expected conversation IDs",
+    "Test B: both original session IDs resumed in new processes; all original messages and unrelated editor preserved",
+    "Default: both original session IDs resumed in new processes; all original messages and unrelated editor preserved",
+    "Two account choices only; no conversation picker or resume confirmation; VS Code host never restarted"
+  ]
+}

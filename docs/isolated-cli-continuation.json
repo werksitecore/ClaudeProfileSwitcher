@@ -1,0 +1,12 @@
+{
+  "status": "pass",
+  "vscode": "1.131.0",
+  "events": [
+    "Both isolated profiles are signed in to distinct accounts",
+    "Default CLI resumed exact test conversation and is idle",
+    "Test B: history transferred, opening resumed CLI",
+    "Test B CLI resumed same ID after previous process exited; history transfer backed up",
+    "Default: history transferred, opening resumed CLI",
+    "Default CLI resumed same ID after previous process exited; history transfer backed up"
+  ]
+}

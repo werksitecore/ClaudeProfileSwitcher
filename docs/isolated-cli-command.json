@@ -1,0 +1,12 @@
+{
+  "status": "pass",
+  "vscode": "1.131.0",
+  "events": [
+    "Both isolated profiles are signed in to distinct accounts",
+    "Default CLI resumed exact test conversation and is idle",
+    "Test B: production switch command opened the same session in a new process",
+    "Default: production switch command opened the same session in a new process",
+    "Two switches used only account selection; no conversation picker or Resume confirmation",
+    "All original saved user/assistant messages preserved after the round trip"
+  ]
+}

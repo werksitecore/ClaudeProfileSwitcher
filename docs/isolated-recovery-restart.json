@@ -1,0 +1,11 @@
+{
+  "status": "pass",
+  "phase": "restart",
+  "vscode": "1.131.0",
+  "events": [
+    "restored settings persisted across a real VS Code restart",
+    "managed directory not adopted as Default",
+    "restore works without Claude installed or any Claude tab",
+    "unrelated setting and synthetic history preserved"
+  ]
+}

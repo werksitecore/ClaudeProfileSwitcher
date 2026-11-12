@@ -1,0 +1,10 @@
+{
+  "status": "pass",
+  "phase": "first",
+  "vscode": "1.131.0",
+  "events": [
+    "managed directory not adopted as Default",
+    "restore works without Claude installed or any Claude tab",
+    "unrelated setting and synthetic history preserved"
+  ]
+}

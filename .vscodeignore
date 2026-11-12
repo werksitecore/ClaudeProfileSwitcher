@@ -1,8 +1,14 @@
 node_modules/**
 .test-tmp/**
+.isolated-vscode/**
+.isolated-live/**
+.isolated-cli-probe/**
+.local-backups/**
 test/**
 .vscode/**
 *.vsix
 downloads/**
 docs/**
+tools/**
+.github/**
 .gitignore

@@ -1,0 +1,1 @@
+exports.activate=context=>({context});

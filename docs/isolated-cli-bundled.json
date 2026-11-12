@@ -1,0 +1,70 @@
+{
+  "vscode": "1.131.0",
+  "status": "pass",
+  "results": [
+    {
+      "name": "ordinary terminal follows work",
+      "pass": true
+    },
+    {
+      "name": "Claude: explicit opposite profile",
+      "pass": true
+    },
+    {
+      "name": "Claude: Default",
+      "pass": true
+    },
+    {
+      "name": "ordinary terminal follows personal",
+      "pass": true
+    },
+    {
+      "name": "Claude: explicit opposite profile",
+      "pass": true
+    },
+    {
+      "name": "Claude: Default",
+      "pass": true
+    },
+    {
+      "name": "ordinary terminal follows work",
+      "pass": true
+    },
+    {
+      "name": "Claude: explicit opposite profile",
+      "pass": true
+    },
+    {
+      "name": "Claude: Default",
+      "pass": true
+    },
+    {
+      "name": "restore original inherited environment",
+      "pass": true
+    },
+    {
+      "name": "live isolated account Default ordinary",
+      "pass": true
+    },
+    {
+      "name": "live isolated account Default explicit",
+      "pass": true
+    },
+    {
+      "name": "live isolated account Test B ordinary",
+      "pass": true
+    },
+    {
+      "name": "live isolated account Test B explicit",
+      "pass": true
+    },
+    {
+      "name": "live isolated account Default ordinary",
+      "pass": true
+    },
+    {
+      "name": "live isolated account Default explicit",
+      "pass": true
+    }
+  ]
+}

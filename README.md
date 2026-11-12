@@ -1,12 +1,14 @@
 # Claude Profile Switcher
 
+> **Controlled testing only; not Marketplace-ready.** Version 0.0.10 fixes conversations that were not copied on a switch when Claude had changed into a project subfolder ("Couldn't load this conversation's saved history"). See the [changelog](CHANGELOG.md). Normal VS Code testing is in progress with settings backed up. See the [investigation and test evidence](docs/HISTORY_INCIDENT.md).
+
 Switch between Claude Code accounts in VS Code, with profiles for the **Claude chat panel** and **CLI terminals**.
 
 Your existing setup is included as **Default**. Create profiles only for your additional accounts.
 
 **[Download the latest extension](https://github.com/werksitecore/ClaudeProfileSwitcher/raw/refs/heads/main/downloads/claude-profile-switcher.vsix)** · [Report an issue](https://github.com/werksitecore/ClaudeProfileSwitcher/issues)
 
-> **Prototype · v0.0.5:** Windows-first, local VS Code only. Automated tests pass; live account switching and chat restoration are still being validated. Not yet published to the VS Code Marketplace.
+> **Prototype · v0.0.9:** Windows-first, local VS Code only. Automated tests pass; live account switching and chat restoration are still being validated. Not yet published to the VS Code Marketplace.
 
 ## Install
 
@@ -33,19 +35,25 @@ Missed the notification? Run **Claude Profiles: Sign In to Profile**.
 
 ### Claude chat panel
 
-1. Stop any running Claude work and keep your project folder open.
+1. Stop any running Claude work, keep your project folder open, and focus the Claude **editor tab**.
 2. Click **Claude: Default** (or your current profile name) in the status bar.
 3. Choose the account you want to use.
 
-The extension backs up and copies this workspace's saved conversations to that profile, then reloads VS Code. Session IDs are preserved so Claude can restore its existing chats. You do not need to pick a conversation or enter an ID.
+The extension closes only the selected Claude editor tab, backs up and copies this workspace's saved conversations, switches the account configuration, then uses Claude's Reopen Closed Session command to reopen the same conversation. VS Code and your other editor tabs stay open. You do not need to pick a conversation or enter an ID. Sidebar-only chats are not supported by this quick-switch flow; open the chat as an editor tab first.
 
 **Default** is always in the list, and the selected profile is marked **Current**. Check Claude's **Account & usage** before sending a message—the status-bar label shows the configured profile, not a verified account identity.
 
 ### Claude CLI
 
-Run **Claude Profiles: Open CLI with Profile**, then choose an account. A new terminal starts with that profile. Enter `/status` to check the account.
+After switching the panel profile, open a **new terminal** and run `claude` to use that account. Already-open terminals keep their previous environment.
 
-Existing CLI sessions keep their original account. To resume a copied chat in a new terminal, run **Claude Profiles: Resume Copied Conversation**, select the chat, then choose **Resume in CLI**.
+To choose a CLI account independently, run **Claude Profiles: Open CLI with Profile**, then choose an account. A new terminal starts with that profile. Enter `/status` to check the account.
+
+CLI terminals opened through **Claude Profiles** now follow a panel profile switch automatically: the extension closes each idle managed CLI, preserves its saved history, and resumes its exact conversation under the selected account. No conversation picker is needed.
+
+To switch only your CLI, focus its terminal and run **Claude Profiles: Switch CLI Profile and Continue**. Choose the account once.
+
+Finish each profile's one-time Claude CLI setup and project trust prompt before switching. Busy or unsaved conversations stop the switch safely. Ordinary shell terminals are not restarted. After a VS Code reload, open your CLI through Claude Profiles again so it can be tracked. To bring an existing copied chat into a managed CLI once, use **Resume Copied Conversation → Resume in CLI**.
 
 ## How history is preserved
 
@@ -68,7 +76,7 @@ For a single-chat transfer or recovery from another profile, use **Claude Profil
 | “Claude is still saving…” | Stop the response, wait a moment, then switch again. |
 | Remote window is rejected | This prototype supports local windows only, not WSL, SSH, or containers. |
 
-Panel changes affect your local VS Code user's other windows too. Chat restoration depends on the official Claude extension and is not yet verified end to end. Try a short test conversation first. Account limits continue to apply independently.
+Panel changes affect your local VS Code user's other windows too. Editor-tab restart and chat restoration depend on the official Claude extension and are not yet verified end to end. Try a short test conversation first. Account limits continue to apply independently.
 
 Before uninstalling, run **Claude Profiles: Restore Original Panel Configuration**. Uninstalling does not delete profiles or backups.
 
@@ -89,4 +97,4 @@ See [validation results and remaining checks](VALIDATION.md) and [detailed proto
 
 ## License
 
-[MIT](LICENSE). Independent project, not affiliated with or endorsed by Anthropic. No telemetry.
+[MIT](LICENSE). Independent project, not affiliated with or endorsed by Anthropic. No telemetry. [Privacy details](PRIVACY.md).

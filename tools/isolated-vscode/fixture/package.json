@@ -1,0 +1,1 @@
+{"name":"claude-code","publisher":"fixture","version":"1.0.0","engines":{"vscode":"^1.94.0"},"contributes":{"configuration":{"properties":{"claudeCode.environmentVariables":{"type":"array","default":[],"scope":"machine"}}}}}

@@ -1,0 +1,7 @@
+{
+  "status": "fail",
+  "events": [
+    "Default CLI resumed exact test conversation and is idle"
+  ],
+  "error": "This Claude CLI does not expose its current session safely. Reopen it with Claude Profiles using an updated official Claude extension."
+}

@@ -61,11 +61,32 @@ test('session picker filters to open project and sorts newest first', async t =>
   assert.equal(sessions[0].id, id);
   assert.deepEqual(await listSessions(source, [path.join(os.tmpdir(), 'different-project')]), []);
 });
+test('session that later cd-ed into a subfolder is still listed for its workspace', async t => {
+  const { source } = await fixture(t);
+  const moved = JSON.stringify({ type: 'assistant', sessionId: id, cwd: path.join(process.cwd(), 'src'), message: { role: 'assistant', content: 'ok' } }) + '\n';
+  await fs.appendFile(path.join(source, relative), moved);
+  const sessions = await listSessions(source, [process.cwd()]);
+  assert.deepEqual(sessions.map(s => s.id), [id]);
+  assert.equal(sessions[0].cwd, process.cwd());
+  assert.deepEqual(await listSessions(source, [process.cwd() + '-sibling']), []);
+});
 test('rejects traversal and concurrent transfer locks', async t => {
   const { source, destination, session } = await fixture(t);
   await assert.rejects(transferSession(source, destination, { ...session, project: '..' }), /Invalid/);
   await fs.mkdir(path.join(destination, '.profile-switch-lock'));
   await assert.rejects(transferSession(source, destination, session), /Another transfer/);
+});
+test('metadata-only startup records do not block copying real workspace conversations', async t => {
+  const { source, destination } = await fixture(t);
+  const emptyId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  const emptyPath = path.join(source, 'projects', project, `${emptyId}.jsonl`);
+  const metadata = JSON.stringify({ type: 'system', cwd: process.cwd(), sessionId: emptyId }) + '\n';
+  await fs.writeFile(emptyPath, metadata);
+  const sessions = await listSessions(source, [process.cwd()]);
+  assert.deepEqual(sessions.map(s => s.id), [id]);
+  await transferWorkspace(source, destination, sessions);
+  assert.equal(await fs.readFile(emptyPath, 'utf8'), metadata);
+  assert.equal(await fs.readFile(path.join(destination, relative), 'utf8'), transcript('first'));
 });
 test('rejects directory junctions without modifying linked history', async t => {
   const { root, source, destination, session } = await fixture(t);
