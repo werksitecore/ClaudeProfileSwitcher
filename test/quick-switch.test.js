@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 test('editor quick switch closes only Claude and reopens through its session command without reloading VS Code', async () => {
-  const commands = new Map(), executed = [], questions = [], copies = [];
+  const commands = new Map(), executed = [], questions = [], copies = [], carried = [];
   let requested = 'Work';
   const target = { name: 'Work', directory: path.resolve('work-profile') };
   const source = path.resolve('personal-profile');
@@ -33,7 +33,7 @@ test('editor quick switch closes only Claude and reopens through its session com
   };
   const module = { exports: {} };
   const code = fs.readFileSync(path.join(__dirname, '../src/extension.js'), 'utf8');
-  vm.runInNewContext(code, { module, setTimeout: callback => callback(), process: { env: {} }, require: name => name === 'vscode' ? vscode : name === './cli-continuation' ? require('../src/cli-continuation') : name === './terminal-profile' ? require('../src/terminal-profile') : name === './recovery' ? require('../src/recovery') : name === './tab-switch' ? require('../src/tab-switch') : name === './profiles' ? require('../src/profiles') : name === './history' ? { listSessions: async () => sessions, transferWorkspace: async (from, to, items) => { copies.push({ from, to, items }); return items; } } : require(name) });
+  vm.runInNewContext(code, { module, setTimeout: callback => callback(), process: { env: {} }, require: name => name === 'vscode' ? vscode : name === './cli-continuation' ? require('../src/cli-continuation') : name === './terminal-profile' ? require('../src/terminal-profile') : name === './recovery' ? require('../src/recovery') : name === './tab-switch' ? require('../src/tab-switch') : name === './profiles' ? require('../src/profiles') : name === './history' ? { listSessions: async () => sessions, transferWorkspace: async (from, to, items) => { copies.push({ from, to, items }); return items; }, pendingSessions: async () => [...sessions, { id: 'other-project', title: 'Other window chat', modified: 3 }], transferEach: async (from, to, items) => { carried.push({ from, to, ids: items.map(s => s.id) }); return { copied: items, skipped: [] }; } } : require(name) });
   await module.exports.activate(context);
   await commands.get('claudeProfiles.switch')();
   assert.equal(terminalDirectories.at(-1), target.directory);
@@ -43,6 +43,8 @@ test('editor quick switch closes only Claude and reopens through its session com
   assert.equal(copies[0].from, source);
   assert.equal(copies[0].to, target.directory);
   assert.equal(copies[0].items, sessions);
+  // Other windows' projects follow the shared account setting, once each.
+  assert.deepEqual(carried[0], { from: source, to: target.directory, ids: ['other-project'] });
   assert.equal(environment.find(e => e.name === 'CLAUDE_CONFIG_DIR').value, target.directory);
   assert.deepEqual(closed, [tab]);
   assert.deepEqual(executed, ['claude-vscode.reopenClosedSession']);

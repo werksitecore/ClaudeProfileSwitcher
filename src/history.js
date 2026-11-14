@@ -23,7 +23,7 @@ async function capture(root, relative, result = new Map()) {
   if (stat.isDirectory()) {
     for (const name of (await fs.readdir(file)).sort()) await capture(root, path.join(relative, name), result);
   } else if (stat.isFile()) {
-    if (stat.size > 100 * 1024 * 1024) throw new Error('History file exceeds the prototype 100 MB limit');
+    if (stat.size > MAX_BYTES) throw new Error('History file exceeds the 512 MB limit');
     result.set(relative, await fs.readFile(file));
   } else throw new Error('Unsupported history file type');
   return result;
@@ -44,7 +44,10 @@ function insideWorkspace(workspace, cwd) {
   const base = path.resolve(workspace).toLowerCase(), target = path.resolve(cwd).toLowerCase();
   return target === base || target.startsWith(base.endsWith(path.sep) ? base : base + path.sep);
 }
-async function listSessions(root, workspaces) {
+// Transcripts grow quickly (one reached 75 MB in a day); a low cap silently
+// stops copying a conversation once it crosses the limit.
+const MAX_BYTES = 512 * 1024 * 1024;
+async function listSessions(root, workspaces, { include } = {}) {
   const result = [];
   let projects;
   try { projects = await fs.readdir(await safe(root, 'projects'), { withFileTypes: true }); }
@@ -57,7 +60,8 @@ async function listSessions(root, workspaces) {
       const relative = path.join('projects', project.name, file);
       const full = await safe(root, relative);
       const stat = await fs.stat(full);
-      if (stat.size > 100 * 1024 * 1024) continue;
+      if (stat.size > MAX_BYTES) continue;
+      if (include && !(await include(project.name, file, stat))) continue;
       const data = await fs.readFile(full, 'utf8');
       let cwd, title, summary, firstPrompt, hasMessages = false;
       for (const line of data.split('\n')) {
@@ -76,7 +80,7 @@ async function listSessions(root, workspaces) {
           }
         } catch { /* A writer may still be appending; transfer validates later. */ }
       }
-      if (!hasMessages || !cwd || !workspaces.some(w => insideWorkspace(w, cwd))) continue;
+      if (!hasMessages || !cwd || (workspaces && !workspaces.some(w => insideWorkspace(w, cwd)))) continue;
       const titles = [title, summary, firstPrompt].filter(s => typeof s === 'string' && s.trim()).map(s => s.replace(/\s+/g, ' ').trim());
       result.push({ id, project: project.name, cwd, title: titles[0] || 'Untitled conversation', titles, modified: stat.mtimeMs });
     }
@@ -154,4 +158,32 @@ async function transferWorkspace(source, destination, sessions) {
   }
   return copied;
 }
-module.exports = { listSessions, transferSession, transferWorkspace, validateTranscript };
+// Every project's conversations that are missing from the destination or newer
+// in the source. The panel setting is shared by all VS Code windows, so a switch
+// in one window must carry the other windows' conversations too.
+async function pendingSessions(source, destination) {
+  return listSessions(source, null, { include: async (project, file, stat) => {
+    const relative = path.join('projects', project, file);
+    let other;
+    try { other = await fs.stat(await safe(destination, relative)); }
+    catch (e) { if (e.code === 'ENOENT') return true; throw e; }
+    // A copy is always newer on disk than its original, so identical content
+    // must not count as a change (it would re-copy and back up every switch).
+    if (other.size === stat.size && digest(await fs.readFile(await safe(source, relative))) === digest(await fs.readFile(await safe(destination, relative)))) return false;
+    return stat.mtimeMs > other.mtimeMs;
+  } });
+}
+// Copy each session independently; one busy or invalid conversation must not
+// block the others. Returns what was copied and what was skipped, with reasons.
+async function transferEach(source, destination, sessions) {
+  const copied = [], skipped = [];
+  for (const session of sessions) {
+    try { copied.push(await transferSession(source, destination, session)); }
+    catch (error) {
+      if (/recovery required/i.test(error.message)) throw error;
+      skipped.push({ session, reason: error.message });
+    }
+  }
+  return { copied, skipped };
+}
+module.exports = { MAX_BYTES, listSessions, pendingSessions, transferSession, transferEach, transferWorkspace, validateTranscript };

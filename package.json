@@ -2,7 +2,7 @@
   "name": "claude-profile-switcher",
   "displayName": "Claude Profile Switcher (Prototype)",
   "description": "Select isolated Claude Code profiles for the official chat panel and CLI terminals.",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "preview": true,
   "publisher": "local-prototype",
   "repository": {

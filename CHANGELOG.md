@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.11 — Switching carries every project's conversations
+
+- **Fixed:** a conversation in another VS Code window looked lost after a switch. The account setting is shared by all windows, but a switch only copied the conversations of the window it was made in. A chat open in a second project stayed in the old profile, and that window then pointed to the new one.
+- A switch now also copies, without asking, every conversation from any project that is missing in the new profile or newer in the old one. Conversations that are identical in both profiles are skipped, so switching back and forth does not re-copy them or pile up backups.
+- If one of those conversations can't be copied (for example, because Claude is still writing to it in another window), the others are still copied. The switch then shows a warning naming it, so you can stop Claude there and switch again.
+- Raised the per-conversation size limit from 100 MB to 512 MB. Long conversations above 100 MB were skipped without any warning.
+
 ## 0.0.10 — Fix lost conversations after a switch
 
 - **Fixed:** a conversation could be left behind on a switch, and reopening it showed *"Couldn't load this conversation's saved history"* / `No conversation found with session ID`. This happened when Claude had run `cd` into a subfolder during the conversation. The switcher looked at the last folder the conversation recorded rather than the folder it started in, so it did not treat the conversation as part of the workspace and did not copy it.

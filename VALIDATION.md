@@ -66,3 +66,10 @@ PASS: actual official Claude panel plus managed native CLI, two distinct authent
 - FIX: match on the first recorded `cwd`, which is the launch folder, and accept a launch folder inside an open workspace folder.
 - PASS: 34 tests, including a regression test for a session that changed into a subfolder. Against the affected real profile, the old code listed 2 of 7 workspace conversations and the fix lists all 7 (read-only). The affected conversation was then copied with `transferSession`, with a backup.
 - VSIX: vsce 4.1.0 cannot run on system Node 20.11, so the 0.0.10 VSIX was made from the 0.0.9 package. Only `history.js`, `package.json` and the bundled Markdown were replaced, links were rewritten as vsce does, and the manifest version was bumped. UNVERIFIED: a live switch with 0.0.10 installed.
+
+## 0.0.11 cross-project switching — 2026-11-14
+
+- USER REPORT: after switching in the ClaudeProfileSwitcher window, a new RoyalGroup chat (in another window) was missing. The transfer log shows that switch copied only the switching window's session, while the global panel setting moved every window to the new profile.
+- FIX: after the strict workspace transfer, `pendingSessions` lists every project's conversations that are missing in the destination or differ in content and are newer. `transferEach` copies each one independently, and failures are reported in a warning rather than aborting the switch.
+- PASS: 36 tests. Read-only dry run between the two real profiles: identical copies are excluded, and only new or changed sessions from the RoyalGroup, GN and ClaudeProfileSwitcher projects are listed. The scan took 0.8–1.2 s.
+- UNVERIFIED: a live switch with 0.0.11 installed while another window's panel is still running. That window keeps its old process, and so its old profile, until its chat is reopened.

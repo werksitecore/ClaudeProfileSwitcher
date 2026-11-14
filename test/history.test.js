@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
-const { listSessions, transferSession, transferWorkspace } = require('../src/history');
+const { listSessions, pendingSessions, transferEach, transferSession, transferWorkspace } = require('../src/history');
 const id = '12345678-1234-1234-1234-123456789abc';
 const project = 'test-project';
 const relative = path.join('projects', project, id + '.jsonl');
@@ -69,6 +69,30 @@ test('session that later cd-ed into a subfolder is still listed for its workspac
   assert.deepEqual(sessions.map(s => s.id), [id]);
   assert.equal(sessions[0].cwd, process.cwd());
   assert.deepEqual(await listSessions(source, [process.cwd() + '-sibling']), []);
+});
+test('pending sessions cover every project and only those missing or newer in the destination', async t => {
+  const { source, destination, session } = await fixture(t);
+  const otherId = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', otherProject = 'other-project';
+  const other = JSON.stringify({ type: 'user', sessionId: otherId, cwd: path.join(os.tmpdir(), 'elsewhere'), message: { role: 'user', content: 'hi' } }) + '\n';
+  await fs.mkdir(path.join(source, 'projects', otherProject), { recursive: true });
+  await fs.writeFile(path.join(source, 'projects', otherProject, otherId + '.jsonl'), other);
+  assert.deepEqual((await pendingSessions(source, destination)).map(s => s.id).sort(), [id, otherId].sort());
+  await transferSession(source, destination, session);
+  assert.deepEqual((await pendingSessions(source, destination)).map(s => s.id), [otherId]);
+  // A copy is newer on disk but identical: it must not flow back.
+  assert.deepEqual((await pendingSessions(destination, source)).map(s => s.id), []);
+  // New activity in the source makes the session pending again.
+  await fs.appendFile(path.join(source, relative), transcript('continued'));
+  const later = new Date(Date.now() + 5000);
+  await fs.utimes(path.join(source, relative), later, later);
+  assert.deepEqual((await pendingSessions(source, destination)).map(s => s.id).sort(), [id, otherId].sort());
+});
+test('transferEach copies the rest when one conversation cannot be copied', async t => {
+  const { source, destination, session } = await fixture(t);
+  const { copied, skipped } = await transferEach(source, destination, [{ ...session, id: 'cccccccc-cccc-cccc-cccc-cccccccccccc' }, session]);
+  assert.deepEqual(copied.map(s => s.id), [id]);
+  assert.equal(skipped.length, 1);
+  assert.match(skipped[0].reason, /no longer exists/);
 });
 test('rejects traversal and concurrent transfer locks', async t => {
   const { source, destination, session } = await fixture(t);

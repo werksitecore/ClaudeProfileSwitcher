@@ -5,7 +5,7 @@ const path = require('node:path');
 const os = require('node:os');
 const crypto = require('node:crypto');
 const { CONFIG, restoreDirectory, conflicts, defaultProfile, panelEntries } = require('./profiles');
-const { listSessions, transferSession, transferWorkspace } = require('./history');
+const { listSessions, pendingSessions, transferSession, transferEach, transferWorkspace } = require('./history');
 const { REOPEN, switchEditorTab } = require('./tab-switch');
 const { recoveryConfiguration } = require('./recovery');
 const { syncTerminalProfile, profileTerminalOptions } = require('./terminal-profile');
@@ -114,7 +114,7 @@ async function activate(context) {
     const plannedCli = await cli.plan([...cli.records.values()].filter(record => path.resolve(record.profile.directory).toLowerCase() === path.resolve(source).toLowerCase()));
     for (const item of plannedCli) await assertDestinationReady(profile, item.session.cwd);
     for (const item of plannedCli) await assertDestinationAvailable(profile.directory, item.session.id);
-    let copied;
+    let copied, skipped = [];
     try { await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Switching Claude to ${profile.name}`, cancellable: false }, () => switchEditorTab({
       tab,
       close: target => vscode.window.tabGroups.close(target, true),
@@ -128,6 +128,11 @@ async function activate(context) {
         for (const item of plannedCli) {
           if (!copied.some(session => session.id === item.session.id)) await transferSession(source, profile.directory, item.session);
         }
+        // The account setting applies to every VS Code window, so also carry
+        // other projects' new or changed conversations, without prompting.
+        const done = new Set([...copied.map(s => s.id), ...plannedCli.map(item => item.session.id)]);
+        const others = (await pendingSessions(source, profile.directory)).filter(s => !done.has(s.id));
+        ({ skipped } = await transferEach(source, profile.directory, others));
       },
       apply: async () => {
         if (!context.globalState.get('original')) await context.globalState.update('original', { directoryEntries: previous.filter(e => e.name === CONFIG) });
@@ -145,6 +150,7 @@ async function activate(context) {
       throw error;
     }
     for (const item of plannedCli) await launch(profile, false, item.session);
+    if (skipped.length) void vscode.window.showWarningMessage(`Switched to ${profile.name}, but ${skipped.length} conversation(s) from other projects were not copied: ${skipped.map(s => `"${s.session.title.slice(0, 40)}" (${s.reason})`).join('; ')}. Stop Claude in the other window and switch again to copy them.`);
   }
   async function switchProfile() {
     if (!vscode.extensions.getExtension('anthropic.claude-code')) throw new Error('Install the official Anthropic Claude Code extension first.');

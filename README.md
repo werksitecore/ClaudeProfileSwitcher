@@ -1,6 +1,6 @@
 # Claude Profile Switcher
 
-> **Controlled testing only; not Marketplace-ready.** Version 0.0.10 fixes conversations that were not copied on a switch when Claude had changed into a project subfolder ("Couldn't load this conversation's saved history"). See the [changelog](CHANGELOG.md). Normal VS Code testing is in progress with settings backed up. See the [investigation and test evidence](docs/HISTORY_INCIDENT.md).
+> **Controlled testing only; not Marketplace-ready.** Version 0.0.11 copies conversations from every project on a switch, not only the current window's, and keeps conversations that changed into a project subfolder. See the [changelog](CHANGELOG.md). Normal VS Code testing is in progress with settings backed up. See the [investigation and test evidence](docs/HISTORY_INCIDENT.md).
 
 Switch between Claude Code accounts in VS Code, with profiles for the **Claude chat panel** and **CLI terminals**.
 
