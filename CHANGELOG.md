@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.12 — The switched account takes effect immediately
+
+- **Fixed:** after a switch, chats that were already open, the sidebar and the usage panel stayed on the previous account until VS Code restarted, and those chats kept using its limits. Claude Code reads the account folder only when it starts a chat process; when the setting changes it refreshes its views but does not restart running chats.
+- A switch now restarts Claude in the window: it restarts VS Code's extension host, not the window. Every Claude tab reopens on the same conversation using the new account, and the usage panel shows the new account. Editors and terminals stay open; other extensions restart for a few seconds.
+- Other open VS Code windows follow the switch too. They first bring their own conversations into the new profile, then restart Claude. If Claude is replying there, or you are debugging, they ask with **Restart Claude Now** instead of interrupting.
+- Advanced Switch and Restore Default restart Claude the same way, instead of asking you to reload the window.
+
 ## 0.0.11 — Switching carries every project's conversations
 
 - **Fixed:** a conversation in another VS Code window looked lost after a switch. The account setting is shared by all windows, but a switch only copied the conversations of the window it was made in. A chat open in a second project stayed in the old profile, and that window then pointed to the new one.

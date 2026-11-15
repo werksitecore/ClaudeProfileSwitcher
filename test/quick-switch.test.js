@@ -29,11 +29,11 @@ test('editor quick switch closes only Claude and reopens through its session com
       showInformationMessage: () => { throw new Error('Unexpected question'); },
       withProgress: async (options, run) => run()
     },
-    commands: { getCommands: async () => ['claude-vscode.reopenClosedSession'], registerCommand: (id, run) => { commands.set(id, run); return {}; }, executeCommand: async id => { executed.push(id); } }
+    commands: { getCommands: async () => ['claude-vscode.reopenClosedSession', 'workbench.action.restartExtensionHost'], registerCommand: (id, run) => { commands.set(id, run); return {}; }, executeCommand: async id => { executed.push(id); } }
   };
   const module = { exports: {} };
   const code = fs.readFileSync(path.join(__dirname, '../src/extension.js'), 'utf8');
-  vm.runInNewContext(code, { module, setTimeout: callback => callback(), process: { env: {} }, require: name => name === 'vscode' ? vscode : name === './cli-continuation' ? require('../src/cli-continuation') : name === './terminal-profile' ? require('../src/terminal-profile') : name === './recovery' ? require('../src/recovery') : name === './tab-switch' ? require('../src/tab-switch') : name === './profiles' ? require('../src/profiles') : name === './history' ? { listSessions: async () => sessions, transferWorkspace: async (from, to, items) => { copies.push({ from, to, items }); return items; }, pendingSessions: async () => [...sessions, { id: 'other-project', title: 'Other window chat', modified: 3 }], transferEach: async (from, to, items) => { carried.push({ from, to, ids: items.map(s => s.id) }); return { copied: items, skipped: [] }; } } : require(name) });
+  vm.runInNewContext(code, { module, setTimeout: callback => callback(), process: { env: {} }, require: name => name === 'vscode' ? vscode : name === './cli-continuation' ? require('../src/cli-continuation') : name === './terminal-profile' ? require('../src/terminal-profile') : name === './recovery' ? require('../src/recovery') : name === './account-refresh' ? require('../src/account-refresh') : name === './tab-switch' ? require('../src/tab-switch') : name === './profiles' ? require('../src/profiles') : name === './history' ? { listSessions: async () => sessions, transferWorkspace: async (from, to, items) => { copies.push({ from, to, items }); return items; }, pendingSessions: async () => [...sessions, { id: 'other-project', title: 'Other window chat', modified: 3 }], transferEach: async (from, to, items) => { carried.push({ from, to, ids: items.map(s => s.id) }); return { copied: items, skipped: [] }; } } : require(name) });
   await module.exports.activate(context);
   await commands.get('claudeProfiles.switch')();
   assert.equal(terminalDirectories.at(-1), target.directory);
@@ -47,7 +47,8 @@ test('editor quick switch closes only Claude and reopens through its session com
   assert.deepEqual(carried[0], { from: source, to: target.directory, ids: ['other-project'] });
   assert.equal(environment.find(e => e.name === 'CLAUDE_CONFIG_DIR').value, target.directory);
   assert.deepEqual(closed, [tab]);
-  assert.deepEqual(executed, ['claude-vscode.reopenClosedSession']);
+  // Every chat in the window restarts on the new account, without reloading VS Code.
+  assert.deepEqual(executed, ['claude-vscode.reopenClosedSession', 'workbench.action.restartExtensionHost']);
   assert.equal(context.workspaceState.get('pendingResume'), undefined);
   requested = 'Default';
   await commands.get('claudeProfiles.switch')();
@@ -55,7 +56,7 @@ test('editor quick switch closes only Claude and reopens through its session com
   assert.equal(copies[1].from, target.directory);
   assert.equal(copies[1].to, source);
   assert.deepEqual(closed, [tab, tab]);
-  assert.deepEqual(executed, ['claude-vscode.reopenClosedSession', 'claude-vscode.reopenClosedSession']);
+  assert.deepEqual(executed, ['claude-vscode.reopenClosedSession', 'workbench.action.restartExtensionHost', 'claude-vscode.reopenClosedSession', 'workbench.action.restartExtensionHost']);
   assert.equal(environment.find(e => e.name === 'CLAUDE_CONFIG_DIR').value, source);
   assert.equal(terminalDirectories.at(-1), source);
 });

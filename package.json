@@ -2,7 +2,7 @@
   "name": "claude-profile-switcher",
   "displayName": "Claude Profile Switcher (Prototype)",
   "description": "Select isolated Claude Code profiles for the official chat panel and CLI terminals.",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "preview": true,
   "publisher": "local-prototype",
   "repository": {
@@ -35,7 +35,7 @@
   },
   "scripts": {
     "test": "node --test test",
-    "check": "node --check src/extension.js && node --check src/profiles.js && node --check src/history.js && node --check src/tab-switch.js && node --check src/recovery.js && node --check src/terminal-profile.js && node --check src/cli-continuation.js",
+    "check": "node --check src/extension.js && node --check src/profiles.js && node --check src/history.js && node --check src/tab-switch.js && node --check src/recovery.js && node --check src/terminal-profile.js && node --check src/cli-continuation.js && node --check src/account-refresh.js",
     "package": "vsce package --no-dependencies --out downloads/claude-profile-switcher.vsix"
   },
   "contributes": {

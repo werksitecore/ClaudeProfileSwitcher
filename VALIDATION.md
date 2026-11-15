@@ -73,3 +73,12 @@ PASS: actual official Claude panel plus managed native CLI, two distinct authent
 - FIX: after the strict workspace transfer, `pendingSessions` lists every project's conversations that are missing in the destination or differ in content and are newer. `transferEach` copies each one independently, and failures are reported in a warning rather than aborting the switch.
 - PASS: 36 tests. Read-only dry run between the two real profiles: identical copies are excluded, and only new or changed sessions from the RoyalGroup, GN and ClaudeProfileSwitcher projects are listed. The scan took 0.8–1.2 s.
 - UNVERIFIED: a live switch with 0.0.11 installed while another window's panel is still running. That window keeps its old process, and so its old profile, until its chat is reopened.
+
+## 0.0.12 immediate account refresh — 2026-11-15
+
+- USER REPORT: after switching, the usage panel showed the previous account and chats kept using it until VS Code restarted.
+- LOG EVIDENCE: the Claude Code log shows "CLAUDE_CONFIG_DIR changed … refreshing every webview" at 02:13:21. The chat channel started at 02:12:55 was never closed, and a usage request at 11:31 still went to that channel.
+- SOURCE INSPECTION (Claude Code 2.1.325): `refreshEveryHost` invalidates caches and pushes state but does not call `restartSessionsWhenIdle`. That only runs after an organization sign-in or a telemetry change. The sidebar views use `retainContextWhenHidden`, so hiding them does not stop their process. Claude panels register a webview serializer that reopens the saved session.
+- FIX: after a switch, run `workbench.action.restartExtensionHost` (present in VS Code 1.131), falling back to a window reload. Other windows react to the setting change: they copy their own workspace conversations, then restart if idle, or ask when busy or debugging.
+- PASS: 38 tests.
+- UNVERIFIED (live): that every Claude tab reopens on the same conversation after the extension host restarts, and what the sidebar shows afterwards. That the usage panel then reports the new account.

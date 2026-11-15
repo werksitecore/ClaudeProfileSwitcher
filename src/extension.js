@@ -8,6 +8,7 @@ const { CONFIG, restoreDirectory, conflicts, defaultProfile, panelEntries } = re
 const { listSessions, pendingSessions, transferSession, transferEach, transferWorkspace } = require('./history');
 const { REOPEN, switchEditorTab } = require('./tab-switch');
 const { recoveryConfiguration } = require('./recovery');
+const { BUSY_MS, refreshAction, restartCommand } = require('./account-refresh');
 const { syncTerminalProfile, profileTerminalOptions } = require('./terminal-profile');
 const { CliContinuation, assertDestinationAvailable, assertDestinationReady } = require('./cli-continuation');
 
@@ -32,6 +33,41 @@ async function activate(context) {
     bar.text = `$(account) Claude: ${selected?.name || (directory ? 'External' : 'Default')}`;
     bar.tooltip = 'Configured panel profile; existing conversations and CLI processes may use an earlier profile. Click to switch.';
     bar.show();
+  }
+  // Claude Code keeps running chats (tabs, sidebar, usage panel) on the account
+  // they started with. Restart this window's Claude so every chat follows the
+  // switch at once. A notice is shown after the restart, when there is one.
+  async function restartClaude(notice) {
+    if (vscode.debug?.activeDebugSession) {
+      const action = await vscode.window.showWarningMessage(`${notice ? `${notice} ` : ''}Claude chats in this window still use the previous account. Restarting them now would also stop your debug session.`, 'Restart Claude Now');
+      if (!action) return;
+    } else if (notice) await context.workspaceState.update('pendingNotice', notice);
+    await vscode.commands.executeCommand(restartCommand(await vscode.commands.getCommands(true)));
+  }
+  // Another window switched the shared account setting: bring this window's
+  // conversations along, then restart its chats unless that would interrupt work.
+  let knownDirectory = currentDirectory();
+  async function followAccountChange() {
+    const previous = knownDirectory, directory = currentDirectory();
+    knownDirectory = directory;
+    if (busy || path.resolve(previous).toLowerCase() === path.resolve(directory).toLowerCase()) return;
+    if (vscode.env.remoteName || !vscode.workspace.isTrusted) return;
+    const claude = vscode.extensions.getExtension('anthropic.claude-code');
+    if (!claude?.isActive) return;
+    const folders = (vscode.workspace.workspaceFolders || []).map(f => f.uri.fsPath);
+    let recent = false;
+    if (folders.length) {
+      const mine = await listSessions(previous, folders);
+      recent = mine.some(s => Date.now() - s.modified < BUSY_MS);
+      // The switching window copies what it can; make sure this window's own
+      // conversations are present and current before its chats reopen.
+      const ids = new Set(mine.map(s => s.id));
+      await transferEach(previous, directory, (await pendingSessions(previous, directory)).filter(s => ids.has(s.id)));
+    }
+    const action = refreshAction({ claudeActive: true, debugging: !!vscode.debug?.activeDebugSession, busy: recent });
+    if (action === 'restart') return restartClaude();
+    const pick = await vscode.window.showWarningMessage('The Claude account was switched in another window. Claude chats here still use the previous account until they restart.', 'Restart Claude Now');
+    if (pick) await vscode.commands.executeCommand(restartCommand(await vscode.commands.getCommands(true)));
   }
   async function choose() {
     if (!profiles().length) {
@@ -150,7 +186,8 @@ async function activate(context) {
       throw error;
     }
     for (const item of plannedCli) await launch(profile, false, item.session);
-    if (skipped.length) void vscode.window.showWarningMessage(`Switched to ${profile.name}, but ${skipped.length} conversation(s) from other projects were not copied: ${skipped.map(s => `"${s.session.title.slice(0, 40)}" (${s.reason})`).join('; ')}. Stop Claude in the other window and switch again to copy them.`);
+    knownDirectory = currentDirectory();
+    await restartClaude(skipped.length ? `Switched to ${profile.name}, but ${skipped.length} conversation(s) from other projects were not copied: ${skipped.map(s => `"${s.session.title.slice(0, 40)}" (${s.reason})`).join('; ')}. Stop Claude in the other window and switch again to copy them.` : undefined);
   }
   async function switchProfile() {
     if (!vscode.extensions.getExtension('anthropic.claude-code')) throw new Error('Install the official Anthropic Claude Code extension first.');
@@ -182,11 +219,11 @@ async function activate(context) {
       await context.globalState.update('original', { directoryEntries: entries().filter(e => e.name === CONFIG) });
     }
     await config().update('environmentVariables', panelEntries(entries(), profile), vscode.ConfigurationTarget.Global);
-    await context.workspaceState.update('pendingResume', session ? { profile, session } : undefined);
+    // After the restart, the copied conversation opens automatically.
+    await context.workspaceState.update('pendingResume', session ? { profile, session, autoResume: true } : undefined);
     refresh();
-    const action = await vscode.window.showInformationMessage(session ? `Conversation copied with the same ID. Original and destination backups are safe. Reload to resume in the panel, or resume in a new CLI terminal. Verify the destination account before sending.` : `Panel configured for ${profile.name}. Reload, start a new conversation, and verify the account in Claude. Existing CLI sessions are unchanged.`, 'Reload Window', session ? 'Resume in CLI' : 'Open CLI');
-    if (action === 'Reload Window') await vscode.commands.executeCommand('workbench.action.reloadWindow');
-    if (action === 'Open CLI' || action === 'Resume in CLI') await launch(profile, false, session);
+    knownDirectory = currentDirectory();
+    await restartClaude(session ? `Conversation copied to ${profile.name} with the same ID; backups are kept. To continue it in a terminal, run Resume Copied Conversation.` : `Claude now uses ${profile.name}. Existing CLI terminals keep their account until reopened.`);
   }
   async function resumeCopied() {
     let pending = context.workspaceState.get('pendingResume');
@@ -210,7 +247,10 @@ async function activate(context) {
     await context.workspaceState.update('pendingResume', undefined);
     await context.workspaceState.update('lastWorkspaceTransfer', undefined);
     refresh();
-    await vscode.window.showInformationMessage('Default configuration restored. No history files were changed. Close and reopen Claude to use it.');
+    knownDirectory = currentDirectory();
+    const notice = 'Default configuration restored. No history files were changed.';
+    if (vscode.extensions.getExtension('anthropic.claude-code')?.isActive) await restartClaude(notice);
+    else await vscode.window.showInformationMessage(notice);
   }
   let busy = false;
   for (const [command, run] of Object.entries({ create, switch: quickSwitch, switchCli: async () => switchCliTo(await choose()), advancedSwitch: switchProfile, resume: resumeCopied, terminal: async () => launch(await choose()), login: async () => launch(await choose(), true), restore })) {
@@ -218,14 +258,19 @@ async function activate(context) {
       if (vscode.env.remoteName) return vscode.window.showErrorMessage('This prototype supports local VS Code windows only.');
       if ((!vscode.workspace.isTrusted && command !== 'restore') || busy) return;
       busy = true;
-      try { await run(); } catch (error) { await vscode.window.showErrorMessage(`Claude Profiles: ${error.message}`); } finally { busy = false; }
+      try { await run(); } catch (error) { await vscode.window.showErrorMessage(`Claude Profiles: ${error.message}`); } finally { busy = false; knownDirectory = currentDirectory(); }
     }));
   }
-  context.subscriptions.push(bar, vscode.workspace.onDidChangeConfiguration(refresh), {
+  context.subscriptions.push(bar, vscode.workspace.onDidChangeConfiguration(event => {
+    refresh();
+    if (event?.affectsConfiguration?.('claudeCode.environmentVariables')) followAccountChange().catch(error => vscode.window.showErrorMessage(`Claude Profiles: ${error.message}`));
+  }), {
     dispose: () => context.environmentVariableCollection?.clear()
   });
   if (vscode.window.onDidCloseTerminal) context.subscriptions.push(vscode.window.onDidCloseTerminal(terminal => cli.forget(terminal)));
   refresh();
+  const notice = context.workspaceState.get('pendingNotice');
+  if (notice) void context.workspaceState.update('pendingNotice', undefined).then(() => vscode.window.showInformationMessage(notice));
   const pending = context.workspaceState.get('pendingResume');
   if (pending?.autoResume && !vscode.env.remoteName && vscode.workspace.isTrusted) {
     void (async () => {
