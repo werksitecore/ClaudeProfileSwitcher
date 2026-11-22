@@ -2,9 +2,9 @@
 
 > **Controlled test build.** Back up VS Code settings before testing; Marketplace publication remains on hold. See [the investigation](../docs/HISTORY_INCIDENT.md).
 
-[Download Claude Profile Switcher](https://github.com/werksitecore/ClaudeProfileSwitcher/raw/refs/heads/main/downloads/claude-profile-switcher.vsix)
+[Download Profile Switcher for Claude Code](https://github.com/werksitecore/ClaudeProfileSwitcher/raw/refs/heads/main/downloads/claude-profile-switcher.vsix)
 
-Current version: **0.0.20** (prototype).
+Current version: **0.0.21** (prototype). 0.0.21 renames the extension to "Profile Switcher for Claude Code"; nothing else changed since 0.0.20. Your profiles and settings are kept when you update.
 
 ## New in 0.0.20: free up storage
 

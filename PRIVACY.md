@@ -1,6 +1,6 @@
 # Privacy
 
-Claude Profile Switcher does not collect telemetry or send account credentials to a server.
+Profile Switcher for Claude Code does not collect telemetry or send account credentials to a server.
 
 The extension stores profile labels, local configuration-directory paths, and transfer metadata in VS Code extension storage. Claude Code manages account sign-in and credentials in its own configuration directories.
 

@@ -1,4 +1,6 @@
-# Claude Profile Switcher
+# Profile Switcher for Claude Code
+
+*Unofficial. Not affiliated with or endorsed by Anthropic. "Claude" and "Claude Code" are Anthropic's trademarks.*
 
 > **Controlled testing only; not Marketplace-ready.** Version 0.0.20 stops switch backups from piling up and adds **Optimize Storage**, which can shrink tens of gigabytes of history and backups to a few (see [Free up space](#free-up-space-step-by-step)). See the [changelog](https://github.com/werksitecore/ClaudeProfileSwitcher/blob/HEAD/CHANGELOG.md). Normal VS Code testing is in progress with settings backed up. See the [investigation and test evidence](https://github.com/werksitecore/ClaudeProfileSwitcher/blob/HEAD/docs/HISTORY_INCIDENT.md).
 
@@ -8,7 +10,7 @@ Your existing setup is included as **Default**. Create profiles only for your ad
 
 **[Download the latest extension](https://github.com/werksitecore/ClaudeProfileSwitcher/raw/refs/heads/main/downloads/claude-profile-switcher.vsix)** · [Report an issue](https://github.com/werksitecore/ClaudeProfileSwitcher/issues)
 
-> **Prototype · v0.0.20:** Windows-first, local VS Code only. Automated tests pass; live account switching and chat restoration are still being validated. Not yet published to the VS Code Marketplace.
+> **Prototype · v0.0.21:** Windows-first, local VS Code only. Automated tests pass; live account switching and chat restoration are still being validated. Not yet published to the VS Code Marketplace.
 
 ## Install
 

@@ -1,8 +1,8 @@
 {
   "name": "claude-profile-switcher",
-  "displayName": "Claude Profile Switcher (Prototype)",
-  "description": "Select isolated Claude Code profiles for the official chat panel and CLI terminals.",
-  "version": "0.0.20",
+  "displayName": "Profile Switcher for Claude Code (Preview)",
+  "description": "Switch between Claude Code accounts in VS Code (chat panel and CLI) and keep conversation storage small. Unofficial; not affiliated with Anthropic.",
+  "version": "0.0.21",
   "preview": true,
   "publisher": "local-prototype",
   "repository": {

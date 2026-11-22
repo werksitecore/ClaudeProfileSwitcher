@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.21: New name
+
+- Renamed to **Profile Switcher for Claude Code**, with a clear note that it is unofficial and not affiliated with Anthropic. The extension ID is unchanged, so updating keeps your profiles, settings and storage. No other changes since 0.0.20.
+
 ## 0.0.20 — Storage: from tens of gigabytes to a few
 
 Builds 0.0.13 to 0.0.19 were unreviewed and are withdrawn. Do not install them.
