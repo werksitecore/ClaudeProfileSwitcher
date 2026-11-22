@@ -2,7 +2,7 @@
   "name": "claude-profile-switcher",
   "displayName": "Claude Profile Switcher (Prototype)",
   "description": "Select isolated Claude Code profiles for the official chat panel and CLI terminals.",
-  "version": "0.0.12",
+  "version": "0.0.20",
   "preview": true,
   "publisher": "local-prototype",
   "repository": {
@@ -35,7 +35,7 @@
   },
   "scripts": {
     "test": "node --test test",
-    "check": "node --check src/extension.js && node --check src/profiles.js && node --check src/history.js && node --check src/tab-switch.js && node --check src/recovery.js && node --check src/terminal-profile.js && node --check src/cli-continuation.js && node --check src/account-refresh.js",
+    "check": "node --check src/extension.js && node --check src/profiles.js && node --check src/history.js && node --check src/tab-switch.js && node --check src/recovery.js && node --check src/terminal-profile.js && node --check src/cli-continuation.js && node --check src/account-refresh.js && node --check src/storage.js && node --check src/archive.js && node --check src/linking.js",
     "package": "vsce package --no-dependencies --out downloads/claude-profile-switcher.vsix"
   },
   "contributes": {
@@ -71,8 +71,23 @@
       {
         "command": "claudeProfiles.switchCli",
         "title": "Claude Profiles: Switch CLI Profile and Continue"
+      },
+      {
+        "command": "claudeProfiles.storage",
+        "title": "Claude Profiles: Manage Storage"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Claude Profiles",
+      "properties": {
+        "claudeProfiles.backupRetentionDays": {
+          "type": "number",
+          "default": 30,
+          "minimum": 1,
+          "description": "Days to keep switch backups that hold no unique content. Backups with unique (diverged) content are kept until you discard them in Manage Storage."
+        }
+      }
+    }
   },
   "devDependencies": {
     "@vscode/vsce": "^4.1.0"

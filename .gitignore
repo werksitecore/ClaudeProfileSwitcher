@@ -6,3 +6,4 @@ node_modules/
 *.vsix
 !downloads/claude-profile-switcher.vsix
 .isolated-cli-probe/
+.isolated-write-probe/

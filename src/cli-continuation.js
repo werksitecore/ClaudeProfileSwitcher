@@ -2,6 +2,8 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { listSessions } = require('./history');
+const storage = require('./storage');
+const linking = require('./linking');
 const UUID = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -27,19 +29,67 @@ async function readSession(record) {
   return { pid, id: state.sessionId, cwd: state.cwd };
 }
 
-async function assertDestinationAvailable(directory, id, alive = processAlive) {
+// In the shared pool every member reads the same transcripts, so a conversation
+// open under any member counts as open under the destination.
+// P1: with hard-linked transcripts, every profile that holds a name for the
+// same transcript file (the destination's, or the source's that the carry
+// will link) shares the conversation, so it counts as open there too.
+// `profiles` adds folders outside <switcherRoot>/profiles (Default);
+// `ignorePids` are the CLIs this switch stops itself.
+async function assertDestinationAvailable(directory, id, alive = processAlive, { switcherRoot, profiles = [], source, ignorePids = [], allowSource = false } = {}) {
+  const check = (dir, shared) => assertSessionsFree(dir, id, alive, ignorePids, shared);
+  if (switcherRoot && await storage.isPoolMember(directory, switcherRoot)) {
+    const members = await storage.poolMembers(switcherRoot);
+    if (!members.some(member => storage.normalize(member) === storage.normalize(directory))) members.push(directory);
+    for (const member of members) await check(member, false);
+    return;
+  }
+  await check(directory, false);
+  if (!switcherRoot || !UUID.test(String(id))) return;
+  const ids = new Set();
+  for (const dir of [directory, source].filter(Boolean)) for (const f of await transcriptNames(dir, id)) ids.add(f.identity);
+  if (!ids.size) return { liveInSource: false };
+  let liveInSource = false;
+  const dirs = await linking.knownDirectories(switcherRoot, [...profiles, source].filter(Boolean));
+  for (const dir of dirs) {
+    if (storage.normalize(dir) === storage.normalize(directory)) continue;
+    if (!(await transcriptNames(dir, id)).some(f => ids.has(f.identity))) continue;
+    // With allowSource (conversations carried along), a session live only in
+    // the source is reported, not refused: the caller copies it instead of linking.
+    if (allowSource && source && storage.normalize(dir) === storage.normalize(source)) {
+      try { await check(dir, true); } catch (error) { if (error.code !== 'ELIVE') throw error; liveInSource = true; }
+      continue;
+    }
+    await check(dir, true);
+  }
+  return { liveInSource };
+}
+// Every projects/<project>/<id>.jsonl in a profile, with its file identity. Links are not followed.
+async function transcriptNames(directory, id) {
+  const projects = path.join(directory, 'projects'), out = [];
+  const top = await fs.lstat(projects).catch(() => null);
+  if (!top?.isDirectory()) return out;
+  for (const name of await fs.readdir(projects)) {
+    const dir = await fs.lstat(path.join(projects, name)).catch(() => null);
+    if (!dir?.isDirectory()) continue;
+    const stat = await fs.lstat(path.join(projects, name, `${id}.jsonl`), { bigint: true }).catch(() => null);
+    if (stat?.isFile()) out.push({ project: name, identity: linking.identity(stat) });
+  }
+  return out;
+}
+async function assertSessionsFree(directory, id, alive, ignorePids = [], shared = false) {
   const root = path.join(directory, 'sessions');
   let files;
   try { files = await fs.readdir(root); } catch (error) { if (error.code === 'ENOENT') return; throw error; }
   for (const name of files.filter(name => /^[1-9][0-9]*\.json$/.test(name))) {
     const pid = Number(name.slice(0, -5));
-    if (!alive(pid)) continue;
+    if (!alive(pid) || ignorePids.includes(pid)) continue;
     const file = path.join(root, name);
     const stat = await fs.lstat(file);
     if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 65536) throw new Error('Cannot verify destination CLI activity safely.');
     let state;
     try { state = JSON.parse(await fs.readFile(file, 'utf8')); } catch { throw new Error('Destination Claude is updating its session state. Try again in a moment.'); }
-    if (state.sessionId === id) throw new Error('This conversation is already open under the destination profile. Close that Claude session before switching.');
+    if (state.sessionId === id) throw Object.assign(new Error(shared ? `This conversation is open in another profile that shares it (${directory}). Never continue one conversation in two profiles at once: close it there before switching.` : 'This conversation is already open under the destination profile. Close that Claude session before switching.'), { code: 'ELIVE' });
   }
 }
 

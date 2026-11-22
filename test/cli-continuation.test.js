@@ -82,3 +82,28 @@ test('native registry identity, idle state, and destination collisions are valid
   await write({ ...state, pid: 9876 });
   await assert.rejects(readSession(record), /identity/);
 });
+
+test('a pool destination is unavailable while any pool member has the conversation open', async t => {
+  await fs.mkdir('.test-tmp', { recursive: true });
+  const root = await fs.mkdtemp(path.resolve('.test-tmp/cli-pool-'));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const store = path.join(root, 'switcher'), shared = path.join(store, 'shared');
+  const [a, b, c] = ['a', 'b', 'c'].map(n => path.join(store, 'profiles', `${n.repeat(8)}-0000-0000-0000-000000000000`));
+  for (const name of ['projects', 'file-history', 'image-cache']) await fs.mkdir(path.join(shared, name), { recursive: true });
+  for (const profile of [a, b]) {
+    await fs.mkdir(profile, { recursive: true });
+    for (const name of ['projects', 'file-history', 'image-cache']) await fs.symlink(path.join(shared, name), path.join(profile, name), 'junction');
+  }
+  await fs.mkdir(path.join(c, 'sessions'), { recursive: true });
+  const id = '12345678-1234-1234-1234-123456789abc';
+  await fs.mkdir(path.join(b, 'sessions'));
+  await fs.writeFile(path.join(b, 'sessions', '555.json'), JSON.stringify({ pid: 555, sessionId: id }));
+  await fs.writeFile(path.join(c, 'sessions', '556.json'), JSON.stringify({ pid: 556, sessionId: id }));
+  await assert.rejects(assertDestinationAvailable(a, id, () => true, { switcherRoot: store }), /already open/);
+  // Without the pool, or for a profile outside it, only its own sessions count.
+  await assertDestinationAvailable(a, id, () => true);
+  await assertDestinationAvailable(a, id, () => false, { switcherRoot: store });
+  await assert.rejects(assertDestinationAvailable(c, id, () => true, { switcherRoot: store }), /already open/);
+  await fs.rm(path.join(c, 'sessions', '556.json'));
+  await assertDestinationAvailable(c, id, () => true, { switcherRoot: store });
+});

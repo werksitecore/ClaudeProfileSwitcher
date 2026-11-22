@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.0.20 — Storage: from tens of gigabytes to a few
+
+Builds 0.0.13 to 0.0.19 were unreviewed and are withdrawn. Do not install them.
+
+- **Fixed:** each switch saved full extra copies of every changed conversation in `.profile-switch-backups`. On one machine they reached 32 GB.
+- Switching no longer saves those copies. An older version is kept only when it isn't an earlier, shorter version of the new one, and it is stored once in a compressed **archive** outside every profile.
+- Identical conversations carried between profiles become **one file with a name in each profile** (NTFS hard link). Continuing a carried conversation in one profile continues it in the other. Never continue one conversation in two profiles at once; the extension refuses when it can tell.
+- Claude Code's own 30-day cleanup in one profile removes only that profile's name; other profiles and the archive keep the conversation.
+- New **Claude Profiles: Manage Storage**, with a guided **Optimize Storage**:
+  1. Moves the old backup store into the archive.
+  2. Archives every conversation.
+  3. Verifies the archive.
+  4. Links identical conversations (optional).
+  5. Removes redundant old backups.
+  6. Verifies again.
+
+  Each step shows a preview and asks first. Claude must be closed in every window and terminal.
+- Also new: Restore or Export a Version, Undo Conversation Linking, Release Stale Storage Lock, and Verify Storage Integrity.
+- Credentials and account settings are never linked, archived or carried.
+
 ## 0.0.12 — The switched account takes effect immediately
 
 - **Fixed:** after a switch, chats that were already open, the sidebar and the usage panel stayed on the previous account until VS Code restarted, and those chats kept using its limits. Claude Code reads the account folder only when it starts a chat process; when the setting changes it refreshes its views but does not restart running chats.
